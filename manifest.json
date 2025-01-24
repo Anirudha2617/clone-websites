@@ -1,0 +1,14 @@
+{
+    "manifest_version": 3,
+    "name": "Save Page with CSS",
+    "version": "1.0",
+    "description": "Save the page source along with its CSS files.",
+    "permissions": ["activeTab", "scripting", "downloads"],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_popup": "popup.html"
+    }
+  }
+  

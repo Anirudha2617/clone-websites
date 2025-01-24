@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Save Page with CSS</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .status { margin-top: 10px; color: green; }
+    progress { width: 100%; height: 20px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h3>Save Page with CSS</h3>
+  <button id="downloadPage">Download Page</button>
+  <div class="status" id="status"></div>
+  <progress id="progressBar" value="0" max="100" style="display:none;"></progress>
+  <script src="popup.js"></script>
+</body>
+</html>
