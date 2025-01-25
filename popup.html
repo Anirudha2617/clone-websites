@@ -11,12 +11,20 @@
     .status { margin-top: 10px; color: green; }
     progress { width: 100%; height: 20px; margin-top: 10px; }
   </style>
+  <!-- Load JSZip before your popup.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <h3>Save Page with CSS</h3>
-  <button id="downloadPage">Download Page</button>
-  <div class="status" id="status"></div>
+  <button id="extractLinksButton">Extract Links</button>
+  <div id="status"></div>
+
+  <!-- <button id="downloadPage">Download Page</button>
+  <div class="status" id="status"></div> -->
+  
   <progress id="progressBar" value="0" max="100" style="display:none;"></progress>
+  
+  <!-- Your script must come after JSZip is loaded -->
   <script src="popup.js"></script>
 </body>
 </html>
