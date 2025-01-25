@@ -1,42 +1,4 @@
-// async function downloadFilesFromCss(cssContent) {
-//     const regex = /url\((['"]?)(.*?)\1\)/g;
-//     const imageUrls = [];
-//     let match;
 
-//     // Extract image URLs from the CSS content using regex
-//     while ((match = regex.exec(cssContent)) !== null) {
-//         let imageUrl = match[2].trim();
-
-//         // If the URL is relative, make it absolute
-//         if (imageUrl.startsWith('assets/images')) {
-//             imageUrl = chrome.runtime.getURL(imageUrl);  // If it's a relative path
-//         }
-
-//         imageUrls.push(imageUrl);
-//     }
-
-//     // Download all the extracted images
-//     for (const url of imageUrls) {
-//         const result = await handleImageDownload(url, "IMAGE");
-//         if (result.success) {
-//             console.log(`Downloaded image: ${result.filename}`);
-//         } else {
-//             console.warn(`Failed to download image: ${url}, Reason: ${result.reason}`);
-//         }
-//     }
-// }
-
-// async function downloadImageMultipleDirectories(imageUrl, directories) {
-//     const imageName = imageUrl.split('/').pop();
-//     for (const directory of directories) {
-//         const result = await handleImageDownload(imageUrl, "IMAGE", directory);
-//         if (result.success) {
-//             console.log(`Image downloaded at ${directory}: ${result.filename}`);
-//         } else {
-//             console.warn(`Failed to download image at ${directory}: ${result.reason}`);
-//         }
-//     }
-// }
 
 // Main download function (modified to include multiple directory handling for images)
 async function downloadFilesFromCss(cssContent) {
@@ -229,25 +191,6 @@ async function downloadAssets(links, directory, type, logData, downloadedFiles) 
     }
 }
 
-// // Helper function to download a file
-// async function handleFileDownload(url, type, directory) {
-//     const result = { filename: "", success: false, reason: "" };
-
-//     try {
-//         const filename = sanitizeFilename(url.split('/').pop());
-//         result.filename = `${directory}/${filename}`;
-//         if (url.startsWith("http") || url.startsWith("https")) {
-//             await chrome.downloads.download({ url, filename: result.filename });
-//             result.success = true;
-//         } else {
-//             result.reason = "Local files are skipped.";
-//         }
-//     } catch (error) {
-//         result.reason = error.message;
-//     }
-
-//     return result;
-// }
 
 // Helper function to save the log file
 async function saveLogFile(logData) {
