@@ -423,6 +423,46 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                             }).filter(Boolean); // Filter out undefined results
                         };
                 
+                        const extractCustomAttributes = () => {
+                            const customFiles = [];
+                        
+                            // Select all elements with custom attributes containing URLs
+                            const elements = Array.from(document.querySelectorAll('[data-jarallax-original-styles]'));
+                        
+                            elements.forEach(el => {
+                                const attributeValue = el.getAttribute('data-jarallax-original-styles');
+                                if (attributeValue) {
+                                    // Extract URLs using regex
+                                    const urlMatch = attributeValue.match(/url\s*\(["']?(.*?)["']?\)/);
+                                    if (urlMatch) {
+                                        const url = urlMatch[1].trim();
+                                        if (!uniqueUrls.has(url)) {
+                                            uniqueUrls.add(url);
+                        
+                                            const fullUrl = new URL(url, window.location.href).href;
+                                            const pathname = new URL(fullUrl).pathname;
+                                            const fileName = pathname.substring(pathname.lastIndexOf('/') + 1);
+                                            const type = getFileType(fileName);
+                        
+                                            customFiles.push({
+                                                tagName: el.tagName,
+                                                rel: 'custom-attribute',
+                                                type,
+                                                fullUrl,
+                                                directory: url,
+                                                fileName,
+                                            });
+                                        }
+                                    }
+                                }
+                            });
+                        
+                            return customFiles;
+                        };
+                        
+                        const customAttributeFiles = extractCustomAttributes();
+                        
+
                         // Extracting links from the page with detailed properties
                         const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
                             .map(link => extractFileDetails(link, 'href'))
@@ -473,16 +513,17 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                             ...scriptLinks,
                             ...imgLinks,
                             ...htmlLinks,
-                            ...inlineBackgroundImages
+                            ...inlineBackgroundImages,
+                            ...customAttributeFiles,
                         ];
 
-                        return { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload };
+                        return { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload, customAttributeFiles };
                     },
                 });
                 
                 
                 // Log the extracted links
-                const { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload } = result.result;
+                const { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload, customAttributeFiles } = result.result;
                 
                 console.log("CSS Links:", cssLinks);
                 console.log("Script Links:", scriptLinks);
@@ -555,7 +596,17 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                 document.getElementById('status').innerText = 'All files downloaded successfully!';
                 
 
+
+
+
+
+
+
+
+
+
                 const data = {
+                    customAttributeFiles,
                     filesToDownload,
                     cssLinks,
                     scriptLinks,
@@ -564,15 +615,6 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                     inlineBackgroundImages,
                     
                 };
-
-
-
-
-
-
-
-
-
 
 
 
