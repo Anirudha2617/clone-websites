@@ -139,7 +139,7 @@ async function handleFileDownload(url, type, defaultDirectory) {
 
 // Ensure sanitized filenames for all downloads
 function sanitizeFilename(filename) {
-    return filename.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+    return filename.replace(/[<>:"/|?*\x00-\x1F]/g, '_');
 }
 
 // Helper function to download HTML files
@@ -190,6 +190,7 @@ async function downloadAssets(links, directory, type, logData, downloadedFiles) 
         }
     }
 }
+
 
 
 // Helper function to save the log file
@@ -349,6 +350,8 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                 const [result] = await chrome.scripting.executeScript({
                     target: { tabId },
                     func: () => {
+                        
+
                         // Function to detect type based on file extension
                         const getFileType = (fileName) => {
                             const ext = fileName.split('.').pop().toLowerCase();
@@ -370,25 +373,31 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                                     return 'unknown'; // Unknown type if the extension doesn't match
                             }
                         };
-                
+                        
                         // Function to extract file details based on an element's attribute
-                        const extractFileDetails = (element, attr) => {
+                        const extractFileDetails = (element, attr, defaultDir) => {
                             const url = element.getAttribute(attr);
-                            const fullUrl = new URL(url, window.location.href).href;
-                            const pathname = new URL(fullUrl).pathname;
-                            const fileName = pathname.substring(pathname.lastIndexOf('/') + 1);
-                            const type = getFileType(fileName);
-                
-                            return {
-                                tagName: element.tagName,
-                                rel: element.getAttribute('rel') || null,
-                                type, // Detected type based on file extension
-                                fullUrl,
-                                directory: url,
-                                fileName,
-                            };
+                            if (!url) return null;
+            
+                            try {
+                                const fullUrl = new URL(url, window.location.href).href;
+                                const pathname = new URL(fullUrl).pathname;
+                                const fileName = pathname.substring(pathname.lastIndexOf('/') + 1);
+                                
+                                let directory = url;
+                                if (directory.url.startsWith("http")){
+                                    directory = `${defaultDir}/${fileName}`;
+                                };
+                                const type = getFileType(fileName);
+            
+                                return { tagName: element.tagName, type, fullUrl, directory, fileName, url };
+                            } catch (error) {
+                                console.error(`Error extracting details for ${attr}:`, error);
+                                return null;
+                            }
                         };
-                
+
+
                         // To hold unique fullUrls
                         const uniqueUrls = new Set();
                 
@@ -409,18 +418,49 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                                         const pathname = new URL(fullUrl).pathname;
                                         const fileName = pathname.substring(pathname.lastIndexOf('/') + 1);
                                         const type = getFileType(fileName);
+                                        let directory = url;
+                                        if (directory.url.startsWith("http")){
+                                            directory = `${defaultDir}/${fileName}`;
+                                        };
                 
                                         return {
                                             tagName: 'DIV', // These are inline styles applied to <div> or other elements
                                             rel: null,
                                             type,
                                             fullUrl,
-                                            directory: url, // The URL or path in the inline style
+                                            directory: directory, // The URL or path in the inline style
                                             fileName,
+                                            url,
                                         };
                                     }
                                 }
-                            }).filter(Boolean); // Filter out undefined results
+                            }).filter(link => {
+                                // Ensure the result is not null or undefined
+                                if (!link) return false;
+                        
+                                // Parse the HTML string into a DOM element
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(html, "text/html");
+                        
+                                // Replace the URL in the provided HTML content if it starts with "http"
+                                if (link.fullUrl.startsWith("http")) {
+                                    let tempElement = doc.querySelector(`[href="${link.fullUrl}"]`);
+                                    if (tempElement) {
+                                        console.log("Came to check directory:");
+                                        tempElement.setAttribute("href", link.directory);
+                        
+                                        // Serialize the updated DOM back to a string
+                                        html = doc.documentElement.outerHTML;
+                                    }
+                                }
+                        
+                                if (uniqueUrls.has(link.fullUrl)) {
+                                    return false; // Skip duplicates
+                                }
+                        
+                                uniqueUrls.add(link.fullUrl);
+                                return true;
+                            });
                         };
                 
                         const extractCustomAttributes = () => {
@@ -460,51 +500,135 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                             return customFiles;
                         };
                         
+                        let html = document.documentElement.outerHTML;
+
                         const customAttributeFiles = extractCustomAttributes();
                         
 
                         // Extracting links from the page with detailed properties
                         const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-                            .map(link => extractFileDetails(link, 'href'))
+                        .map(link => extractFileDetails(link, 'href', "assets/css"))
+                        .filter(link => {
+                            // Ensure the result is not null or undefined
+                            if (!link) return false;
+                    
+                            // Parse the HTML string into a DOM element
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, "text/html");
+                    
+                            // Replace the URL in the provided HTML content if it starts with "http"
+                            if (link.fullUrl.startsWith("http")) {
+                                let tempElement = doc.querySelector(`[href="${link.fullUrl}"]`);
+                                if (tempElement) {
+                                    console.log("Came to check directory:");
+                                    tempElement.setAttribute("href", link.directory);
+                    
+                                    // Serialize the updated DOM back to a string
+                                    html = doc.documentElement.outerHTML;
+                                }
+                            }
+                    
+                            if (uniqueUrls.has(link.fullUrl)) {
+                                return false; // Skip duplicates
+                            }
+                    
+                            uniqueUrls.add(link.fullUrl);
+                            return true;
+                        });
+                    
+                
+                        const scriptLinks = Array.from(document.querySelectorAll('script[src]'))
+                            .map(script => extractFileDetails(script, 'src',"assets/js"))
                             .filter(link => {
+                                // Ensure the result is not null or undefined
+                                if (!link) return false;
+                        
+                                // Parse the HTML string into a DOM element
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(html, "text/html");
+                        
+                                // Replace the URL in the provided HTML content if it starts with "http"
+                                if (link.fullUrl.startsWith("http")) {
+                                    let tempElement = doc.querySelector(`[href="${link.fullUrl}"]`);
+                                    if (tempElement) {
+                                        console.log("Came to check directory:");
+                                        tempElement.setAttribute("href", link.directory);
+                        
+                                        // Serialize the updated DOM back to a string
+                                        html = doc.documentElement.outerHTML;
+                                    }
+                                }
+                        
                                 if (uniqueUrls.has(link.fullUrl)) {
                                     return false; // Skip duplicates
                                 }
+                        
                                 uniqueUrls.add(link.fullUrl);
                                 return true;
                             });
                 
-                        const scriptLinks = Array.from(document.querySelectorAll('script[src]'))
-                            .map(script => extractFileDetails(script, 'src'))
-                            .filter(script => {
-                                if (uniqueUrls.has(script.fullUrl)) {
-                                    return false; // Skip duplicates
-                                }
-                                uniqueUrls.add(script.fullUrl);
-                                return true;
-                            });
-                
                         const imgLinks = Array.from(document.querySelectorAll('img[src]'))
-                            .map(img => extractFileDetails(img, 'src'))
-                            .filter(img => {
-                                if (uniqueUrls.has(img.fullUrl)) {
+                            .map(img => extractFileDetails(img, 'src',"assets/images"))
+                            .filter(link => {
+                                // Ensure the result is not null or undefined
+                                if (!link) return false;
+                        
+                                // Parse the HTML string into a DOM element
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(html, "text/html");
+                        
+                                // Replace the URL in the provided HTML content if it starts with "http"
+                                if (link.fullUrl.startsWith("http")) {
+                                    let tempElement = doc.querySelector(`[href="${link.fullUrl}"]`);
+                                    if (tempElement) {
+                                        console.log("Came to check directory:");
+                                        tempElement.setAttribute("href", link.directory);
+                        
+                                        // Serialize the updated DOM back to a string
+                                        html = doc.documentElement.outerHTML;
+                                    }
+                                }
+                        
+                                if (uniqueUrls.has(link.fullUrl)) {
                                     return false; // Skip duplicates
                                 }
-                                uniqueUrls.add(img.fullUrl);
+                        
+                                uniqueUrls.add(link.fullUrl);
                                 return true;
                             });
                 
                         const htmlLinks = Array.from(document.querySelectorAll('a[href]'))
-                            .map(a => extractFileDetails(a, 'href'))
-                            .filter(a => {
-                                if (uniqueUrls.has(a.fullUrl)) {
+                            .map(a => extractFileDetails(a, 'href', "" ))
+                            .filter(link => {
+                                // Ensure the result is not null or undefined
+                                if (!link) return false;
+                        
+                                // Parse the HTML string into a DOM element
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(html, "text/html");
+                        
+                                // Replace the URL in the provided HTML content if it starts with "http"
+                                if (link.fullUrl.startsWith("http")) {
+                                    let tempElement = doc.querySelector(`[href="${link.fullUrl}"]`);
+                                    if (tempElement) {
+                                        console.log("Came to check directory:");
+                                        tempElement.setAttribute("href", link.directory);
+                        
+                                        // Serialize the updated DOM back to a string
+                                        html = doc.documentElement.outerHTML;
+                                    }
+                                }
+                        
+                                if (uniqueUrls.has(link.fullUrl)) {
                                     return false; // Skip duplicates
                                 }
-                                uniqueUrls.add(a.fullUrl);
+                        
+                                uniqueUrls.add(link.fullUrl);
                                 return true;
                             });
                         
-
+                        
+                        
                         // Extracting background images from inline styles (corrected)
                         const inlineBackgroundImages = extractInlineBackgroundImages();
 
@@ -517,14 +641,28 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                             ...customAttributeFiles,
                         ];
 
-                        return { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload, customAttributeFiles };
-                    },
+                        return { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload, customAttributeFiles, html };
+                    }
                 });
                 
+                if (!result || !result.result) {
+                    console.error("Failed to extract links. Result is null.");
+                    statusDiv.innerText = "Error: Unable to extract links.";
+                    return;
+                }
                 
+                // Safely destructure result.result
+                // const { cssLinks, filesToDownload, html } = result.result || {};
+
                 // Log the extracted links
-                const { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload, customAttributeFiles } = result.result;
-                
+                const { cssLinks, scriptLinks, imgLinks, htmlLinks, inlineBackgroundImages, filesToDownload, customAttributeFiles, html } = result.result || {};
+                if (!cssLinks || !filesToDownload || !html) {
+                    console.error("Extracted data is incomplete.");
+                    statusDiv.innerText = "Error: Extracted data is incomplete.";
+                    return;
+                }
+
+
                 console.log("CSS Links:", cssLinks);
                 console.log("Script Links:", scriptLinks);
                 console.log("Image Links:", imgLinks);
@@ -532,7 +670,16 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                 console.log("Inline Background Images:", inlineBackgroundImages);
                 console.log("Merged:", filesToDownload);
                 
+                const htmlBlob = new Blob([html], { type: "text/html" });
+                const htmlUrl = URL.createObjectURL(htmlBlob);
                 
+                await chrome.downloads.download({
+                    url: htmlUrl,
+                    filename: "index.html", // Correctly specify the filename
+                    saveAs: false, // Set to 'true' if you want the "Save As" dialog to show
+                });
+                
+
                   
                 
                 // Create a JSON object with the extracted data
@@ -540,31 +687,36 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                 async function downloadFile(file) {
                     return new Promise((resolve, reject) => {
                         try {
-                            // Check if the URL is HTTPS
+                            // Validate HTTPS URL
                             if (!file.fullUrl.startsWith('https://')) {
                                 console.log(`Skipping non-HTTPS file: ${file.fullUrl}`);
-                                resolve('failed');  // Resolve with 'failed' status for non-HTTPS URLs
-                                return;  // Skip the download process for non-HTTPS URLs
+                                resolve('failed'); // Skip non-HTTPS URLs
+                                return;
                             }
                 
                             // Trigger the download
-                            chrome.downloads.download({
-                                url: file.fullUrl,
-                                filename: file.directory,  // Specify the folder and file name based on the directory and file
-                                saveAs: false, // Set to 'true' if you want the "Save As" dialog to show up
-                            }, function(downloadId) {
-                                if (chrome.runtime.lastError) {
-                                    reject(`Error downloading ${file.fullUrl}: ${chrome.runtime.lastError}`);
-                                } else {
-                                    console.log(`Downloading: ${file.directory}`);
-                                    resolve('success'); // Resolving as success
+                            chrome.downloads.download(
+                                {
+                                    url: file.fullUrl,
+                                    filename: file.directory, // Specify the file path (directory and name)
+                                    saveAs: false, // Set to 'true' to show the "Save As" dialog
+                                },
+                                function (downloadId) {
+                                    if (chrome.runtime.lastError) {
+                                        // Handle runtime errors
+                                        reject(`Error downloading ${file.fullUrl}: ${chrome.runtime.lastError.message}`);
+                                    } else {
+                                        console.log(`Download started for: ${file.fullUrl}`);
+                                        resolve('success'); // Successfully triggered download
+                                    }
                                 }
-                            });
+                            );
                         } catch (error) {
-                            reject(`Error in downloadFile function: ${error}`);
+                            reject(`Error in downloadFile function: ${error.message}`);
                         }
                     });
                 }
+                
                 
                 
                 const totalFiles = filesToDownload.length;
@@ -597,14 +749,6 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                 
 
 
-
-
-
-
-
-
-
-
                 const data = {
                     customAttributeFiles,
                     filesToDownload,
@@ -615,8 +759,6 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                     inlineBackgroundImages,
                     
                 };
-
-
 
                 // Convert the data to a JSON string
                 const jsonData = JSON.stringify(data, null, 2);
@@ -630,13 +772,6 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
                     filename: "ani/extracted_links.json",  // Specify the folder and file name
                 });
 
-                // const blob = new Blob([jsonData], { type: "application/json" });
-                // const url = URL.createObjectURL(blob);
-                // const a = document.createElement("a");
-                // a.href = url;
-                // a.download = "ani/extracted_links.json"; // Suggest folder "ani" with file name
-                // a.click();
-                
 
                 // Clean up
                 URL.revokeObjectURL(jsonFileUrl);
@@ -650,4 +785,9 @@ document.getElementById("extractLinksButton").addEventListener("click", async ()
     });
 });
 
-
+                // const blob = new Blob([jsonData], { type: "application/json" });
+                // const url = URL.createObjectURL(blob);
+                // const a = document.createElement("a");
+                // a.href = url;
+                // a.download = "ani/extracted_links.json"; // Suggest folder "ani" with file name
+                // a.click();
